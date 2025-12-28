@@ -18,7 +18,7 @@ echo ""
 
 # Download checksum
 echo -e "${YELLOW}Downloading checksum...${NC}"
-if curl -f -s -o "$CHECKSUM_FILE" "$CHECKSUM_URL"; then
+if curl -f -s -L -o "$CHECKSUM_FILE" "$CHECKSUM_URL"; then
     EXPECTED_CHECKSUM=$(cat "$CHECKSUM_FILE" | awk '{print $1}')
     echo -e "${GREEN}✓ Expected checksum: ${EXPECTED_CHECKSUM:0:16}...${NC}"
 else
@@ -58,7 +58,7 @@ echo -e "${YELLOW}Downloading OpenFoodFacts dump (~20GB)...${NC}"
 echo "This may take 30-60 minutes."
 echo ""
 
-if curl -# -o "$DUMP_FILE" "$DUMP_URL"; then
+if curl -# -L -o "$DUMP_FILE" "$DUMP_URL"; then
     echo ""
     echo -e "${GREEN}✓ Download complete!${NC}"
     echo -e "  Size: $(du -h "$DUMP_FILE" | cut -f1)"

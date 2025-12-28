@@ -31,7 +31,7 @@ echo ""
 
 # Download checksum file
 echo -e "${YELLOW}Downloading checksum file...${NC}"
-if curl -f -s -o "$CHECKSUM_FILE" "$CHECKSUM_URL"; then
+if curl -f -s -L -o "$CHECKSUM_FILE" "$CHECKSUM_URL"; then
     EXPECTED_CHECKSUM=$(cat "$CHECKSUM_FILE" | awk '{print $1}')
     echo -e "${GREEN}✓ Checksum downloaded: ${EXPECTED_CHECKSUM:0:16}...${NC}"
 else
@@ -82,7 +82,7 @@ if [ "$SKIP_DOWNLOAD" != "true" ]; then
     echo "This will take 30-60 minutes depending on your connection."
     echo ""
     
-    if curl -# -o "$DUMP_FILE" "$DUMP_URL"; then
+    if curl -# -L -o "$DUMP_FILE" "$DUMP_URL"; then
         echo -e "${GREEN}✓ Download complete!${NC}"
         echo -e "  Size: $(du -h "$DUMP_FILE" | cut -f1)"
         
