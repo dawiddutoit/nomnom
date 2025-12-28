@@ -344,28 +344,6 @@ python tests/e2e/test_barcode_scanning.py
 - ✅ **ALWAYS** implement complete, working functionality
 - ✅ If a feature cannot be completed, **FAIL EXPLICITLY** with clear error message
 
-```python
-# ❌ WRONG - Placeholder
-async def get_food_by_barcode(barcode: str) -> dict:
-    # TODO: Implement barcode lookup
-    pass
-
-# ✅ CORRECT - Complete implementation
-async def get_food_by_barcode(barcode: str) -> FoodItem:
-    """Lookup food item by barcode in custom_foods then products."""
-    # Check custom foods first
-    custom = await db.custom_foods.find_one({"barcode": barcode})
-    if custom:
-        return transform_custom_food(custom)
-
-    # Check OpenFoodFacts products
-    product = await db.products.find_one({"code": barcode})
-    if product:
-        return transform_product(product)
-
-    raise FoodNotFoundError(f"No food found for barcode: {barcode}")
-```
-
 ### 2. Type Safety - NO `Any` Types
 - ❌ **NEVER** use `Any`, `object`, or untyped parameters
 - ❌ **NEVER** use `dict` without type parameters (use `dict[str, str]`)
@@ -373,45 +351,13 @@ async def get_food_by_barcode(barcode: str) -> FoodItem:
 - ❌ **AVOID** `| None` unless the value is genuinely optional
 - ✅ **ALWAYS** use specific types, Pydantic models, or TypedDict
 - ✅ **ALWAYS** use strict mypy/pyright with no exceptions
-
-```python
-# ❌ WRONG - Untyped
-async def search_foods(query, limit=20):
-    results = await db.products.find({"$text": {"$search": query}})
-    return results
-
-# ❌ WRONG - Using Any
-from typing import Any
-async def search_foods(query: str, limit: int = 20) -> list[Any]:
-    ...
-
-# ✅ CORRECT - Fully typed
-async def search_foods(query: str, limit: int = 20) -> list[FoodItem]:
-    """Search products by name with text index."""
-    cursor = db.products.find({"$text": {"$search": query}}).limit(limit)
-    products = await cursor.to_list(length=limit)
-    return [transform_product(p) for p in products]
-```
+- 📚 **Use skill:** `python-best-practices-type-safety` for patterns and fixes
 
 ### 3. No Optional Types Without Reason
 - ❌ **AVOID** `| None` for return types when failure should raise exception
 - ❌ **AVOID** `| None` for parameters when value is always required
 - ✅ **USE** `| None` ONLY when value is genuinely optional (like `brand` field)
 - ✅ **RAISE EXCEPTIONS** instead of returning `None` for "not found" cases
-
-```python
-# ❌ WRONG - Optional return type masks errors
-async def get_user(username: str) -> User | None:
-    return await db.users.find_one({"username": username})
-
-# ✅ CORRECT - Explicit exception on not found
-async def get_user(username: str) -> User:
-    """Get user by username. Raises UserNotFound if not exists."""
-    user_doc = await db.users.find_one({"username": username})
-    if not user_doc:
-        raise UserNotFoundError(f"User not found: {username}")
-    return User.model_validate(user_doc)
-```
 
 ### 4. Dependency Injection - ALWAYS
 - ❌ **NEVER** instantiate dependencies inside functions
@@ -420,57 +366,14 @@ async def get_user(username: str) -> User:
 - ✅ **ALWAYS** inject database connections via function parameters
 - ✅ **ALWAYS** inject settings via dependency injection
 - ✅ **ALWAYS** use FastAPI's `Depends()` for dependencies
-
-```python
-# ❌ WRONG - Global access
-from app.db.mongodb import get_database
-from app.config import settings
-
-async def find_food(barcode: str):
-    db = get_database()  # Global singleton
-    mongo_url = settings.MONGODB_URL  # Direct config access
-    ...
-
-# ✅ CORRECT - Dependency injection
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from fastapi import Depends
-
-async def find_food(
-    barcode: str,
-    db: AsyncIOMotorDatabase = Depends(get_database),
-) -> FoodItem:
-    """Find food by barcode using injected database."""
-    ...
-```
+- 📚 **Use skill:** `implement-dependency-injection` for patterns
 
 ### 5. Settings Must Be Injected
 - ❌ **NEVER** import `settings` directly in service/repository code
 - ❌ **NEVER** use `os.getenv()` in application code
 - ✅ **ALWAYS** inject `Settings` object via dependency injection
 - ✅ **ONLY** access `settings` in FastAPI dependency providers
-
-```python
-# ❌ WRONG
-from app.config import settings
-
-class FoodService:
-    async def upload_photo(self, file: UploadFile):
-        path = f"{settings.UPLOAD_DIR}/photo.jpg"  # Direct access
-        ...
-
-# ✅ CORRECT
-class FoodService:
-    def __init__(self, upload_dir: str):
-        self.upload_dir = upload_dir
-
-    async def upload_photo(self, file: UploadFile):
-        path = f"{self.upload_dir}/photo.jpg"
-        ...
-
-# In dependency provider
-def get_food_service(settings: Settings = Depends(get_settings)) -> FoodService:
-    return FoodService(upload_dir=settings.UPLOAD_DIR)
-```
+- 📚 **Use skill:** `implement-dependency-injection` for configuration patterns
 
 ### 6. Fail-Fast Principle
 - ❌ **NEVER** catch exceptions and return `None` or default values
@@ -478,42 +381,26 @@ def get_food_service(settings: Settings = Depends(get_settings)) -> FoodService:
 - ✅ **ALWAYS** let exceptions bubble up with context
 - ✅ **ALWAYS** validate inputs at boundaries (API endpoints, not services)
 - ✅ **ALWAYS** use specific exception types
-
-```python
-# ❌ WRONG - Silencing errors
-async def get_food(barcode: str) -> dict | None:
-    try:
-        food = await db.products.find_one({"code": barcode})
-        return food
-    except Exception:
-        return None  # What went wrong? No one knows!
-
-# ✅ CORRECT - Explicit errors with context
-async def get_food(barcode: str) -> FoodItem:
-    """Get food by barcode. Raises FoodNotFound if not exists."""
-    try:
-        food_doc = await db.products.find_one({"code": barcode})
-    except pymongo.errors.PyMongoError as e:
-        raise DatabaseError(f"Failed to query products: {e}") from e
-
-    if not food_doc:
-        raise FoodNotFoundError(f"No food found for barcode: {barcode}")
-
-    return transform_product(food_doc)
-```
+- 📚 **Use skill:** `python-best-practices-fail-fast-imports` for validation
 
 ## Enforcement
 
 **These standards are enforced by**:
-- `mypy` with `--strict` flag
+- `mypy` with `--strict` flag (configured in `pyproject.toml`)
 - `pyright` with strict type checking
 - Code review before commits
 - `quality-verify-integration` skill checks
 - Manual verification by Claude Code
 
+**When implementing features**:
+1. 📚 **Use `python-best-practices-type-safety`** - Resolve type errors systematically
+2. 📚 **Use `implement-dependency-injection`** - Apply DI patterns correctly
+3. 📚 **Use `quality-code-review`** - Self-review before commits
+4. 📚 **Use `quality-verify-integration`** - Verify CCV compliance
+
 **If you encounter code that violates these standards**:
 1. **Refactor immediately** - Don't propagate bad patterns
-2. **Use skills** - `python-best-practices-type-safety` for type issues
+2. **Use skills** - Reference the skills above for correct patterns
 3. **Ask for clarification** - If requirements are unclear
 
 ---
